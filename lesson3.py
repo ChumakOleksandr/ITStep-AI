@@ -1,7 +1,6 @@
 import os
 import dotenv
 
-from typing import List
 from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
