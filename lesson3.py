@@ -1,136 +1,149 @@
 import os
 import dotenv
 
-from typing import List
 from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 
-
-# завантаження апі ключа
 dotenv.load_dotenv()
+
 api_key = os.getenv("GEMINI_API_KEY")
 
-# створити llm
 llm = ChatGoogleGenerativeAI(
-    model='gemini-2.5-flash',
-    api_key=api_key,
+    model="gemini-3.5-flash-lite",
+    api_key=api_key
+)
+
+# Завдання 1
+# Напишіть модель для генерації персонального плану
+# тренувань з двох ланцюгів:
+#  Перший ланцюг отримує мету тренування(схуднення,
+# набір м’язів, тощо) та повертає список вправ
+#  Другий ланцюг отримує список вправ, рівень
+# підготовки користувача(низький, середній,
+# професіонал) та кількість часу на тиждень(в годинах)
+# і повертає план тренувань
+
+class Exercises(BaseModel):
+    exercises: list[str] = Field(
+        description="список вправ для заданої мети тренування"
+    )
+
+
+parser1 = PydanticOutputParser(
+    pydantic_object=Exercises
+)
+
+instructions1 = parser1.get_format_instructions()
+
+
+prompt1 = PromptTemplate.from_template("""
+    Ти -- фітнес-тренер.
+
+    Твоя задача -- підібрати список вправ відповідно
+    до мети тренування користувача.
+
+    ###ІНСТРУКЦІЇ###
+    1. Враховуй мету тренування.
+    2. Підбери основні вправи, які допомагають досягти цієї мети.
+    3. Вкажи не більше 10 вправ.
+    4. Назви тільки вправи без детального опису.
+
+    ###ФОРМАТ ВІДПОВІДІ###
+    {format_instructions}
+
+    ###ВХІДНІ ДАНІ###
+    Мета тренування: {goal}
+""",
+    partial_variables={
+        "format_instructions": instructions1
+    }
 )
 
 
-# Користувач задає питання.
-# Потрібно дати відповіть та запропопонувати цікаві факти по тій
-# же темі що і питання
-
-# # варіант 1 -- все в один промпт
-# prompt = PromptTemplate.from_template(
-#     """
-#     Ти -- чатбот для навчання. Твоя задача давати відповідь на питання.
-#     Також потрібно запропонувати декілька цікавих фактів по тій же темі
-#     що і питання
-#
-#     ### Питання
-#     {question}
-#     """
-# )
-#
-# chain1 = prompt | llm
-#
-# response = chain1.invoke({
-#     "question": "Коли була висадка на місяць"
-# })
-#
-# print(response)
+chain1 = prompt1 | llm | parser1
 
 
-# варіант 2 -- розьити на 2 кроки
-# дати відповідь та визначити тему питання
-# згенерувати цікаві факти по темі
-
-# пишемо парсер
-
-# структура відповіді
-class ParserResult(BaseModel):
-    question_answer: str = Field(description="Answer to user question")
-    topics: List[str] = Field(description="список пов'язаних тем до питання")
+class TrainingPlan(BaseModel):
+    plan: str = Field(
+        description="персональний план тренувань"
+    )
 
 
-# створення парсера
-parser = PydanticOutputParser(pydantic_object=ParserResult)
-
-# інструкція для llm як має виглядати відповідь
-instructions = parser.get_format_instructions()
-
-
-prompt = PromptTemplate.from_template(
-    """
-    Ти -- чатбот для навчання. Твоя задача давати відповідь на питання.
-    Також потрібно визначити теми які відносяться до цього питання
-
-    ### Питання
-    {question}
-    
-    ### ФОРМАТ ВІДПОВІДІ
-    {instructions}
-    """,
-    partial_variables={"instructions": instructions}  # одразу передаємо інструкції
+parser2 = PydanticOutputParser(
+    pydantic_object=TrainingPlan
 )
 
-llm = llm.with_structured_output(ParserResult)
-chain = prompt | llm
+instructions2 = parser2.get_format_instructions()
 
-question = input("Введіть питання: ")
 
-response = chain.invoke({
-    "question": question,
-})
+prompt2 = PromptTemplate.from_template("""
+    Ти -- персональний фітнес-тренер.
 
-print(f"Відповідь: {response.question_answer}")
+    Твоя задача -- створити план тренувань
+    на основі списку вправ, рівня підготовки користувача
+    та кількості часу на тренування.
 
-# # print(response)
-# # print(type(response))
-# #
-# # print(response.question_answer)
-# # print(response.topics)
-#
-# # генерація цікавих фактів на основі тем
-# class FactResponse(BaseModel):
-#     facts: List[str] = Field(description="список цікавих фактів розом з їхнім описом")
-#
-#
-# # створення парсера
-# parser = PydanticOutputParser(pydantic_object=FactResponse)
-#
-# # інструкція для llm як має виглядати відповідь
-# instructions = parser.get_format_instructions()
-#
-# prompt = PromptTemplate.from_template(
-#     """
-#     Ти -- генератор цікавих фактів. Твоя задача навести 5 цікавих фактів
-#     на задані теми
-#
-#     ### ТЕМИ
-#     {topics}
-#
-#     ### ФОРМАТ ВІДПОВІДІ
-#     {instructions}
-#     """,
-#     partial_variables={"instructions": instructions}  # одразу передаємо інструкції
-# )
-#
-# chain2 = prompt | llm | parser
-#
-# response = chain2.invoke(
-#     {
-#         "topics": response.topics
-#     }
-# )
-#
-# facts = response.facts
-#
-# print("Цікаві факти")
-# for fact in facts:
-#     print(fact)
-#
-# whole_chain = chain | chain2
+    ###ІНСТРУКЦІЇ###
+    1. Враховуй рівень підготовки користувача.
+    2. Враховуй кількість годин на тиждень.
+    3. Розподіли тренування протягом тижня.
+    4. Для кожного тренування вкажи вправи.
+    5. Вкажи приблизну тривалість тренування.
+    6. Не використовуй вправи, яких немає у списку.
+    7. План повинен бути реалістичним для вказаного рівня підготовки.
+
+    ###ФОРМАТ ВІДПОВІДІ###
+    {format_instructions}
+
+    ###ВХІДНІ ДАНІ###
+
+    Список вправ:
+    {exercises}
+
+    Рівень підготовки:
+    {level}
+
+    Кількість часу на тиждень:
+    {hours} годин
+""",
+    partial_variables={
+        "format_instructions": instructions2
+    }
+)
+
+
+chain2 = prompt2 | llm | parser2
+
+
+goal = "набір м'язів"
+
+level = "середній"
+
+hours = 5
+
+
+data = {
+    "goal": goal
+}
+
+response1 = chain1.invoke(data)
+
+print("Мета тренування:", goal)
+
+print("\nСписок вправ:")
+for exercise in response1.exercises:
+    print("-", exercise)
+
+
+data = {
+    "exercises": response1.exercises,
+    "level": level,
+    "hours": hours
+}
+
+response2 = chain2.invoke(data)
+
+print("\nПлан тренувань:")
+print(response2.plan)
