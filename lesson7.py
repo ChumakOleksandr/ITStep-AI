@@ -1,108 +1,90 @@
 import streamlit as st
-
-
-# за замовчуванням щапускається нескіченний цикл
-# Сторінка сайту постійно оновлюється і відповідно
-# код нижче постіно запускається
-
-# # заголовок сайту
-# st.title("IT STEP ai")
-#
-# # звичайний текст
-# st.markdown("Звичайний текст. Можливо опис вашої програми")
-#
-# # отримати повідомлення від користувача
-# user_query = st.chat_input("Ваше повідомлення")
-#
-# # st.markdown(f"Ви ввели {user_query}")
-# #
-# # if user_query == 'Привіт':
-# #     st.markdown(f"Як справи")
-#
-#
-# # глобальна пам'ять в streamlit
-# # session_state -- dict з зміними
-#
-# if user_query == None:
-#     # це самий початок(користувач ще нічого не писав
-#     st.session_state['history'] = []
-#
-# # добавити user_query в історію
-# st.session_state['history'].append(user_query)
-#
-# st.markdown(f"Ви ввели {st.session_state['history']}")
-
-
-
-
-
-# ЧАТ-БОТ
-
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import (
     HumanMessage,
     AIMessage,
     SystemMessage,
 )
+# Завдання 1
+# Напишіть додаток, який симулює спілкування з певною
+# відомою людиною.
+# З ким саме спілкуватись вводить користувач через
+# st.text_input()
 
-# заголовок
-st.title("ITStep chat bot")
+api_key = st.secrets["GEMINI_API_KEY"]
 
-# завантаження апі ключа за допомогою streamlit
-api_key = st.secrets.get("GEMINI_API_KEY")
-
-# створити llm
 llm = ChatGoogleGenerativeAI(
-    model='gemini-2.5-flash-lite',
-    api_key=api_key,
+    model="gemini-3.5-flash-lite",
+    api_key=api_key
 )
 
-user_query = st.chat_input("Ваше повідомлення")
+st.title("Чат з відомою людиною")
 
-# якщо це початок то створити історію в session state
-if user_query is None:
-    # історія повідомлень
-    st.session_state['history'] = [
-        # перше повідомлення з основними інструкціями(промпт)
+person = st.text_input(
+    "З ким ви хочете поспілкуватися?",
+    placeholder="Наприклад: Ілон Маск"
+)
+
+if person and "history" not in st.session_state:
+    st.session_state.history = [
         SystemMessage(
-            """
-            Ти -- ввічливий чат бот, твоя задача давити короткі та
-            чіткі відповіді на питання
+            f"""
+            Ти симулюєш спілкування з відомою людиною — {person}.
+
+            Веди себе так, ніби ти ця людина.
+            Відповідай у її стилі, враховуй її професію,
+            відомі факти про неї та особливості її характеру.
+
+            Не пояснюй, що ти штучний інтелект.
+            Підтримуй звичайне спілкування з користувачем.
             """
         )
     ]
 
-# якщо повідомлення введено, то дати відповідь від моделі
-if user_query:
-    # переволимо повідомлення в HumanMessage
-    human_message = HumanMessage(user_query)
+if person and st.session_state.get("current_person") != person:
+    st.session_state.current_person = person
+    st.session_state.history = [
+        SystemMessage(
+            f"""
+            Ти симулюєш спілкування з відомою людиною — {person}.
 
-    # добавляємо до історії повідомлень
-    st.session_state['history'].append(human_message)
+            Веди себе так, ніби ти ця людина.
+            Відповідай у її стилі та враховуй відомі факти
+            про її життя, професію та діяльність.
 
-    # запускаємо модель
-    response = llm.invoke(st.session_state['history'])
+            Підтримуй природне спілкування з користувачем.
+            """
+        )
+    ]
 
-    # response -- AIMessage
-    # добавляємо до історії повідомлень
-    st.session_state['history'].append(response)
+if not person:
+    st.info("Спочатку введіть ім'я відомої людини")
 
+user_text = st.chat_input("Введіть повідомлення")
 
-# вивести всю історію спілкування
-for message in st.session_state['history']:
-    # пропускаємо SystemMessage
-    if isinstance(message, SystemMessage):
-        continue
+if user_text is not None and person:
 
-    # отримати вміст
-    text = message.content
+    human_message = HumanMessage(content=user_text)
 
-    # отримати роль
-    if isinstance(message, HumanMessage):
-        role = "human"
-    else:
-        role = 'ai'
+    messages = st.session_state.history
 
-    # вивести повідомлення з підписом
-    with st.chat_message(role):
-        st.markdown(text)
+    messages.append(human_message)
+
+    response = llm.invoke(messages)
+
+    messages.append(response)
+
+if "history" in st.session_state:
+
+    for message in st.session_state.history:
+        if isinstance(message, SystemMessage):
+            continue
+
+        if isinstance(message, HumanMessage):
+            role = "user"
+        else:
+            role = "assistant"
+
+        with st.chat_message(role):
+            st.markdown(message.content)
+
