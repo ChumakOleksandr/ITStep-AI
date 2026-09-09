@@ -112,7 +112,7 @@ position = st.text_input(
 
 uploaded_file = st.file_uploader(
     "Завантажте опис вакансії",
-    type=["txt", "pdf", "docx"]
+    type=["txt"]
 )
 
 vacancy_text = ""
